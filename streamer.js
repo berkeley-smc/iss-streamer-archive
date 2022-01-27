@@ -382,6 +382,10 @@ var dayOfYear = today - yearFirstDay;
 var timestampnow = dayOfYear * 24 + hoursUTC + minutes / 60 + seconds / 3600;
 console.log("timestamp now: " + timestampnow);
 
+lsClient.addListener({
+  onStatusChange: (newStatus) => console.log(`ls-client: ${newStatus}`)
+});
+
 lsClient.connect();
 
 sub.addListener({
@@ -394,8 +398,10 @@ sub.addListener({
   onItemUpdate: function (update) {
     console.log(update.getItemName());
     fs.appendFile(
-      update.getItemName() + ".txt",
-      update.getValue("TimeStamp") + " " + update.getValue("Value") + " \n"
+      `data/${update.getItemName()}.txt`,
+      `${update.getValue("TimeStamp")} ${update.getValue("Value")}\n`,
+      'utf8',
+      () => {}
     );
   },
 });
@@ -412,7 +418,7 @@ timeSub.addListener({
         AOS = "Stale Signal";
         AOSnum = 2;
       } else {
-        console.log("Signal Acquired!");
+        // console.log("Signal Acquired!");
         AOS = "Siqnal Acquired";
         AOSnum = 1;
       }
@@ -422,8 +428,10 @@ timeSub.addListener({
       AOSnum = 0;
     }
     fs.appendFile(
-      "AOS.txt",
-      "AOS " + update.getValue("TimeStamp") + " " + AOSnum + "\n"
+      "data/AOS.txt",
+      `AOS ${update.getValue("TimeStamp")} ${AOSnum}\n`,
+      'utf8',
+      () => {}
     );
   },
 });

@@ -1,5 +1,7 @@
 const fs = require('fs');
 const process = require('process');
+// TODO: Extract to web server.
+const http = require('http');
 
 const ls = require('lightstreamer-client-node');
 const Sentry = require("@sentry/node");
@@ -465,3 +467,29 @@ redisClient.on('error', (err) => console.log('Redis redisClient Error', err));
     },
   });
 })();
+
+///// HEROKU: Spin up a small server and ping it...
+const requestListener = function (req, res) {
+  res.writeHead(200);
+  res.end(`Server is still up: ${new Date().getTime()}`);
+};
+
+const port = 80;
+const host = 'localhost';
+const HEROKU_URL = 'http://smc-data.herokuapp.com/';
+
+const server = http.createServer(requestListener);
+server.listen(port, host, () => {
+    console.log(`Server is running on http://${host}:${port}`);
+});
+
+setInterval(() => {
+  const req = https.get(HEROKU_URL, res => {
+    console.log(`statusCode: ${res.statusCode}`)
+  });
+  req.on('error', error => {
+    console.error(error);
+    Sentry.captureException(error);
+  });
+  req.end();
+}, 30000);

@@ -1,1 +1,1 @@
-main: node streamer.js
+worker: node streamer.js

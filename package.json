@@ -1,5 +1,8 @@
 {
   "dependencies": {
-    "lightstreamer-client-node": "^8.0.3"
+    "@sentry/node": "^6.17.2",
+    "@sentry/tracing": "^6.17.2",
+    "lightstreamer-client-node": "^8.0.3",
+    "redis": "^4.0.2"
   }
 }

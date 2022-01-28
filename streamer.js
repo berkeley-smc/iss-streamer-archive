@@ -1,5 +1,19 @@
 const fs = require('fs');
-const ls = require("lightstreamer-client-node");
+const process = require('process');
+
+const ls = require('lightstreamer-client-node');
+const Sentry = require("@sentry/node");
+const redis = require('redis');
+
+const SENTRY_DSN = process.env['SENTRY_DSN'];
+const REDIS_URL = process.env['REDIS_URL'];
+
+// Error monitoring.
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+  });
+}
 
 const lsClient = new ls.LightstreamerClient(
   "https://push.lightstreamer.com",
@@ -362,6 +376,8 @@ var timeSub = new ls.Subscription("MERGE", "TIME_000001", [
 lsClient.subscribe(sub);
 lsClient.subscribe(timeSub);
 
+
+// TODO - MB: Cleanup and document.
 var AOStimestamp = 0.0;
 var AOS;
 var difference = 0.0;
@@ -388,50 +404,64 @@ lsClient.addListener({
 
 lsClient.connect();
 
-sub.addListener({
-  onSubscription: function () {
-    console.log("Subscribed");
-  },
-  onUnsubscription: function () {
-    console.log("Unsubscribed");
-  },
-  onItemUpdate: function (update) {
-    console.log(update.getItemName());
-    fs.appendFile(
-      `data/${update.getItemName()}.txt`,
-      `${update.getValue("TimeStamp")} ${update.getValue("Value")}\n`,
-      'utf8',
-      () => {}
-    );
-  },
+const redisClient = redis.createClient({
+  url: REDIS_URL
 });
 
-timeSub.addListener({
-  onItemUpdate: function (update) {
-    var status = update.getValue("Status.Class");
-    AOStimestamp = parseFloat(update.getValue("TimeStamp"));
-    difference = timestampnow - AOStimestamp;
+redisClient.on('error', (err) => console.log('Redis redisClient Error', err));
 
-    if (status === "24") {
-      if (difference > 0.00153680542553047) {
-        console.log("Stale Signal!");
-        AOS = "Stale Signal";
-        AOSnum = 2;
+(async () => {
+  await redisClient.connect();
+
+  sub.addListener({
+    onSubscription: function () {
+      console.log("Subscribed");
+    },
+    onUnsubscription: function () {
+      console.log("Unsubscribed");
+    },
+    onItemUpdate: async function (update) {
+      let PARAMETER = update.getItemName();
+      let ROW = `${update.getValue("TimeStamp")} ${update.getValue("Value")}`;
+      console.log(PARAMETER, );
+      fs.appendFile(
+        `data/${PARAMETER}.txt`,
+        `${ROW}\n`,
+        'utf8',
+        () => {}
+      );
+      await redisClient.RPUSH(PARAMETER, ROW);
+    },
+  });
+
+  timeSub.addListener({
+    onItemUpdate: async function (update) {
+      var status = update.getValue("Status.Class");
+      AOStimestamp = parseFloat(update.getValue("TimeStamp"));
+      difference = timestampnow - AOStimestamp;
+
+      if (status === "24") {
+        if (difference > 0.00153680542553047) {
+          console.log("Stale Signal!");
+          AOS = "Stale Signal";
+          AOSnum = 2;
+        } else {
+          // console.log("Signal Acquired!");
+          AOS = "Siqnal Acquired";
+          AOSnum = 1;
+        }
       } else {
-        // console.log("Signal Acquired!");
-        AOS = "Siqnal Acquired";
-        AOSnum = 1;
+        console.log("Signal Lost!");
+        AOS = "Signal Lost";
+        AOSnum = 0;
       }
-    } else {
-      console.log("Signal Lost!");
-      AOS = "Signal Lost";
-      AOSnum = 0;
-    }
-    fs.appendFile(
-      "data/AOS.txt",
-      `AOS ${update.getValue("TimeStamp")} ${AOSnum}\n`,
-      'utf8',
-      () => {}
-    );
-  },
-});
+      fs.appendFile(
+        "data/AOS.txt",
+        `AOS ${update.getValue("TimeStamp")} ${AOSnum}\n`,
+        'utf8',
+        () => {}
+      );
+      await redisClient.RPUSH('AOS', `${update.getValue("TimeStamp")} ${AOSnum}`);
+    },
+  });
+})();

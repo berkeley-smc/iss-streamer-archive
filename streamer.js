@@ -474,7 +474,7 @@ const requestListener = function (req, res) {
   res.end(`Server is still up: ${new Date().getTime()}`);
 };
 
-const port = 80;
+const port = process.env.PORT || 5000;
 const host = 'localhost';
 const HEROKU_URL = 'http://smc-data.herokuapp.com/';
 

@@ -1,1 +1,1 @@
-worker: node streamer.js
+web: node streamer.js
